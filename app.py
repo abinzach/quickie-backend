@@ -19,7 +19,7 @@ groq_chat = ChatGroq(
     model_name='mixtral-8x7b-32768',  # Default model
 )
 
-conversation_memory = ConversationBufferWindowMemory(k=10)  # Default memory length
+conversation_memory = ConversationBufferWindowMemory(k=5)  # Default memory length
 conversation = ConversationChain(llm=groq_chat, memory=conversation_memory)
 
 @app.route('/')
