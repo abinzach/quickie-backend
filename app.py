@@ -6,14 +6,19 @@ from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
 from flask_cors import CORS
+from flask_pymongo import PyMongo
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-groq_api_key = os.environ['GROQ_API_KEY'] 
+
+# Configure MongoDB connection
+app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
+mongo = PyMongo(app)
 
 # Initialize Groq Langchain chat object and conversation
+groq_api_key = os.environ['GROQ_API_KEY']
 groq_chat = ChatGroq(
     groq_api_key=groq_api_key,
     model_name='mixtral-8x7b-32768',  # Default model
@@ -26,7 +31,6 @@ conversation = ConversationChain(llm=groq_chat, memory=conversation_memory)
 def hello():
     return 'Hello, World!'
 
-
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -37,9 +41,14 @@ def chat():
     if model and model in ['mixtral-8x7b-32768', 'llama2-70b-4096']:
         groq_chat.model_name = model
 
-    response = conversation(user_question)
-    return jsonify(response)
+    # Save conversation to MongoDB
+    conversation_entry = {
+        'user_question': user_question,
+        'response': conversation(user_question)
+    }
+    mongo.db.conversations.insert_one(conversation_entry)
 
+    return jsonify(conversation_entry['response'])
 
 if __name__ == '__main__':
-    app.run()  # You may want to set debug to False in production
+    app.run()
