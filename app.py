@@ -17,14 +17,24 @@ CORS(app)
 app.config['MONGO_URI'] = os.environ.get('MONGO_URI')
 mongo = PyMongo(app)
 
-# Initialize Groq Langchain chat object and conversation
+# Initialize Groq Langchain chat object
 groq_api_key = os.environ['GROQ_API_KEY']
 groq_chat = ChatGroq(
     groq_api_key=groq_api_key,
     model_name='mixtral-8x7b-32768',  # Default model
 )
 
-conversation_memory = ConversationBufferWindowMemory(k=5)  # Default memory length
+# Retrieve conversation history from MongoDB
+def get_conversation_history():
+    conversations = list(mongo.db.conversations.find({}, {'user_question': 1}))
+    history = [conv['user_question'] for conv in conversations]
+    return history
+
+# Initialize conversation memory with retrieved history
+conversation_history = get_conversation_history()
+conversation_memory = ConversationBufferWindowMemory(k=5, initial_state=conversation_history)
+
+# Initialize ConversationChain with Groq chat object and conversation memory
 conversation = ConversationChain(llm=groq_chat, memory=conversation_memory)
 
 @app.route('/')
