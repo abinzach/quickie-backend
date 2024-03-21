@@ -5,6 +5,7 @@ from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
+import json
 from flask_cors import CORS
 
 load_dotenv()
@@ -22,13 +23,24 @@ groq_chat = ChatGroq(
 conversation_memory = ConversationBufferWindowMemory(k=10)  # Default memory length
 conversation = ConversationChain(llm=groq_chat, memory=conversation_memory)
 
+# Path to the file where conversation history will be stored
+CONVERSATION_HISTORY_FILE = 'conversation_history.json'
+
+# Load conversation history from file if it exists
+if os.path.exists(CONVERSATION_HISTORY_FILE):
+    with open(CONVERSATION_HISTORY_FILE, 'r') as file:
+        conversation_history = json.load(file)
+else:
+    conversation_history = []
+
 @app.route('/')
 def hello():
     return 'Hello, World!'
 
-
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    global conversation_history
+    
     data = request.json
     user_question = data.get('userQuestion')
     model = data.get('model')
@@ -38,8 +50,18 @@ def chat():
         groq_chat.model_name = model
 
     response = conversation(user_question)
+    
+    # Add current conversation to history
+    conversation_history.append({
+        'user_question': user_question,
+        'response': response
+    })
+    
+    # Save conversation history to file
+    with open(CONVERSATION_HISTORY_FILE, 'w') as file:
+        json.dump(conversation_history, file, indent=4)
+    
     return jsonify(response)
-
 
 if __name__ == '__main__':
     app.run()  # You may want to set debug to False in production
